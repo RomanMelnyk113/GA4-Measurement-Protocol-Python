@@ -7,23 +7,24 @@
 # assistance in strategy, implementation, or auditing existing work.
 ###############################################################################
 
+import datetime
 import json
 import logging
-import urllib.request
-import time
-import datetime
+import os
 import random
-from ga4mp.utils import params_dict
+import sys
+import time
+import urllib.request
+
 from ga4mp.event import Event
 from ga4mp.store import BaseStore, DictStore
+from ga4mp.utils import params_dict
 
-import os, sys
-sys.path.append(
-    os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.append(os.path.normpath(os.path.join(os.path.dirname(__file__), "..")))
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
 
 class BaseGa4mp(object):
     """
@@ -63,10 +64,14 @@ class BaseGa4mp(object):
     """
 
     def __init__(self, api_secret, store: BaseStore = None):
-        self._initialization_time = time.time() # used for both session_id and calculating engagement time
+        self._initialization_time = (
+            time.time()
+        )  # used for both session_id and calculating engagement time
         self.api_secret = api_secret
         self._event_list = []
-        assert store is None or isinstance(store, BaseStore), "if supplied, store must be an instance of BaseStore"
+        assert store is None or isinstance(
+            store, BaseStore
+        ), "if supplied, store must be an instance of BaseStore"
         self.store = store or DictStore()
         self._check_store_requirements()
         self._base_domain = "https://www.google-analytics.com/mp/collect"
@@ -75,9 +80,14 @@ class BaseGa4mp(object):
     def _check_store_requirements(self):
         # Store must contain "session_id" and "last_interaction_time_msec" in order for tracking to work properly.
         if self.store.get_session_parameter("session_id") is None:
-            self.store.set_session_parameter(name="session_id", value=int(self._initialization_time))
+            self.store.set_session_parameter(
+                name="session_id", value=int(self._initialization_time)
+            )
         # Note: "last_interaction_time_msec" factors into the required "engagement_time_msec" event parameter.
-        self.store.set_session_parameter(name="last_interaction_time_msec", value=int(self._initialization_time * 1000))
+        self.store.set_session_parameter(
+            name="last_interaction_time_msec",
+            value=int(self._initialization_time * 1000),
+        )
 
     def create_new_event(self, name):
         return Event(name=name)
@@ -141,7 +151,6 @@ class BaseGa4mp(object):
         self._event_list = []
 
     def append_event_to_params_dict(self, new_name_and_parameters):
-
         """
         Method to append event name and parameters key-value pairing(s) to parameters dictionary.
 
@@ -156,7 +165,9 @@ class BaseGa4mp(object):
 
         params_dict.update(new_name_and_parameters)
 
-    def _http_post(self, batched_event_list, validation_hit=False, postpone=False, date=None):
+    def _http_post(
+        self, batched_event_list, validation_hit=False, postpone=False, date=None
+    ):
         """
         Method to send http POST request to google-analytics.
 
@@ -180,7 +191,6 @@ class BaseGa4mp(object):
         domain = self._base_domain
         if validation_hit is True:
             domain = self._validation_domain
-        logger.info(f"Sending POST to: {domain}")
 
         # loop through events in batches of 25
         batch_number = 1
@@ -212,6 +222,7 @@ class BaseGa4mp(object):
                 # add timestamp to hit
                 request["timestamp_micros"] = batch["_timestamp_micros"]
 
+            logger.info(f"Sending POST to url={url}; body={request}")
             req = urllib.request.Request(url)
             req.add_header("Content-Type", "application/json; charset=utf-8")
             jsondata = json.dumps(request)
@@ -220,14 +231,12 @@ class BaseGa4mp(object):
             result = urllib.request.urlopen(req, json_data_as_bytes)
 
             status_code = result.status
-            logger.info(f"Batch Number: {batch_number}")
-            logger.info(f"Status code: {status_code}")
+            logger.info(f"Status code={status_code}; Batch Number: {batch_number}")
             batch_number += 1
 
         return status_code
 
     def _check_params(self, events):
-
         """
         Method to check whether the provided event payload parameters align with supported parameters.
 
@@ -252,8 +261,9 @@ class BaseGa4mp(object):
         assert type(events) == list, "events should be a list"
 
         for event in events:
-
-            assert isinstance(event, dict), "each event should be an instance of a dictionary"
+            assert isinstance(
+                event, dict
+            ), "each event should be an instance of a dictionary"
 
             assert "name" in event, 'each event should have a "name" key'
 
@@ -280,14 +290,24 @@ class BaseGa4mp(object):
 
             event_params = event["params"]
             if "session_id" not in event_params.keys():
-                event_params["session_id"] = self.store.get_session_parameter("session_id")
+                event_params["session_id"] = self.store.get_session_parameter(
+                    "session_id"
+                )
             if "engagement_time_msec" not in event_params.keys():
-                last_interaction_time = self.store.get_session_parameter("last_interaction_time_msec")
-                event_params["engagement_time_msec"] = current_time_in_milliseconds - last_interaction_time if current_time_in_milliseconds > last_interaction_time else 0
-                self.store.set_session_parameter(name="last_interaction_time_msec", value=current_time_in_milliseconds)
+                last_interaction_time = self.store.get_session_parameter(
+                    "last_interaction_time_msec"
+                )
+                event_params["engagement_time_msec"] = (
+                    current_time_in_milliseconds - last_interaction_time
+                    if current_time_in_milliseconds > last_interaction_time
+                    else 0
+                )
+                self.store.set_session_parameter(
+                    name="last_interaction_time_msec",
+                    value=current_time_in_milliseconds,
+                )
 
     def _add_user_props_to_hit(self, hit):
-
         """
         Method is a helper function to add user properties to outgoing hits.
 
@@ -352,10 +372,15 @@ class BaseGa4mp(object):
             ), "Provided date cannot be in the future"
 
     def _build_url(self, domain):
-        raise NotImplementedError("Subclass should be using this function, but it was called through the base class instead.")
+        raise NotImplementedError(
+            "Subclass should be using this function, but it was called through the base class instead."
+        )
 
     def _build_request(self, batch):
-        raise NotImplementedError("Subclass should be using this function, but it was called through the base class instead.")
+        raise NotImplementedError(
+            "Subclass should be using this function, but it was called through the base class instead."
+        )
+
 
 class GtagMP(BaseGa4mp):
     """
@@ -369,7 +394,12 @@ class GtagMP(BaseGa4mp):
         A unique identifier for a client, representing a specific browser/device.
     """
 
-    def __init__(self, api_secret, measurement_id, client_id,):
+    def __init__(
+        self,
+        api_secret,
+        measurement_id,
+        client_id,
+    ):
         super().__init__(api_secret)
         self.measurement_id = measurement_id
         self.client_id = client_id
@@ -384,7 +414,8 @@ class GtagMP(BaseGa4mp):
         """
         Utility function for generating a new client ID matching the typical format of 10 random digits and the UNIX timestamp in seconds, joined by a period.
         """
-        return "%0.10d" % random.randint(0,9999999999) + "." + str(int(time.time()))
+        return "%0.10d" % random.randint(0, 9999999999) + "." + str(int(time.time()))
+
 
 class FirebaseMP(BaseGa4mp):
     """
