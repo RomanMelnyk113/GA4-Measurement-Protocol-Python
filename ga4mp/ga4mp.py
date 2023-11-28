@@ -222,7 +222,7 @@ class BaseGa4mp(object):
                 # add timestamp to hit
                 request["timestamp_micros"] = batch["_timestamp_micros"]
 
-            logger.info(f"Sending POST to url={url}; body={request}")
+            logger.info(f"Sending POST to domain={domain}; body={request}")
             req = urllib.request.Request(url)
             req.add_header("Content-Type", "application/json; charset=utf-8")
             jsondata = json.dumps(request)
